@@ -12,7 +12,7 @@ from six.moves.queue import Queue, Empty
 from six.moves.urllib.parse import urlparse
 
 from .output import out
-from . import events, scraper
+from . import events, scraper, scraperutils
 
 
 class ComicQueue(Queue):
@@ -158,7 +158,7 @@ def getComics(options):
     errors = 0
     try:
         for scraperobj in getScrapers(options.comic, options.basepath,
-                                      options.adult, options.multimatch):
+                                      options.adult, options.multimatch, guess=options.guess):
             jobs.put(scraperobj)
         # start threads
         num_threads = min(options.parallel, jobs.qsize())
@@ -189,7 +189,7 @@ def finish():
     out.warn("Waiting for download threads to finish.")
 
 
-def getScrapers(comics, basepath=None, adult=True, multiple_allowed=False, listing=False):
+def getScrapers(comics, basepath=None, adult=True, multiple_allowed=False, listing=False, guess=False):
     """Get scraper objects for the given comics."""
     if '@' in comics:
         # only scrapers whose directory already exists
@@ -208,13 +208,18 @@ def getScrapers(comics, basepath=None, adult=True, multiple_allowed=False, listi
                 # make the following command work:
                 # find Comics -type d | xargs -n1 -P10 dosage -b Comics
                 comic = comic[len(basepath):].lstrip(os.sep)
+
             if ':' in comic:
                 name, index = comic.split(':', 1)
                 indexes = index.split(',')
             else:
                 name = comic
                 indexes = None
-            found_scrapers = scraper.find_scrapers(name, multiple_allowed=multiple_allowed)
+            if guess and name.lower() in ['http', 'https']:
+                indexes = None
+                found_scrapers = scraperutils.invent_scrapers(comic)
+            else:
+                found_scrapers = scraperutils.find_scrapers(name, multiple_allowed=multiple_allowed)
             for scraperobj in found_scrapers:
                 if shouldRunScraper(scraperobj, adult, listing):
                     # FIXME: Find a better way to work with indexes
@@ -223,9 +228,8 @@ def getScrapers(comics, basepath=None, adult=True, multiple_allowed=False, listi
                         scrapers.add(scraperobj)
                         yield scraperobj
 
-
 def get_existing_comics(basepath=None, adult=True, listing=False):
-    for scraperobj in scraper.get_scrapers(include_removed=True):
+    for scraperobj in scraperutils.get_scrapers(include_removed=True):
         dirname = scraperobj.get_download_dir(basepath)
         if os.path.isdir(dirname):
             if shouldRunScraper(scraperobj, adult, listing):

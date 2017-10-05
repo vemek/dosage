@@ -95,6 +95,7 @@ def setup_options():
     # are not "real" (moved & removed)
     parser.add_argument('--list-all', action='store_true',
                         help=argparse.SUPPRESS)
+    parser.add_argument('--guess', action='store_true', help='(Experimental) Try to guess how to download a comic given a URL.')
     parser.add_argument('comic', nargs='*',
                         help='comic module name (including case insensitive substrings)')
     try:
